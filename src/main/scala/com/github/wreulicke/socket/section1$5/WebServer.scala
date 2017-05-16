@@ -10,22 +10,24 @@ import resource._
 import scala.io.Source
 
 class WebServer(port: Int) {
+  private val docRoot = Paths.get(".")
 
   def start() {
     for (
       server <- managed(new ServerSocket(port));
       socket <- managed(server.accept)) {
-      val startLine: Option[Array[String]] = Source.fromInputStream(socket.getInputStream).getLines.toList.headOption.map(_.split(" "))
-      startLine.flatMap {
+      val startLine = Source.fromInputStream(socket.getInputStream).getLines().take(1).toList.headOption.map(_.split(" "))
+      startLine flatMap {
         case Array("GET", path, "HTTP/1.1") => Some(path)
         case _ => None
       } foreach { path =>
         val output = socket.getOutputStream
         writeHeader.foreach(output.write(_))
-        for (src <- managed(Source.fromInputStream(Files.newInputStream(Paths.get(".", path))))) {
+        for (src <- managed(Source.fromInputStream(Files.newInputStream(docRoot.resolve(path))))) {
           src.foreach(output.write(_))
         }
       }
+
     }
   }
 
