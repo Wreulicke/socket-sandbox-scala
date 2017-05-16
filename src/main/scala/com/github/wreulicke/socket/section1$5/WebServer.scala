@@ -15,15 +15,16 @@ class WebServer(port: Int) {
     for (
       server <- managed(new ServerSocket(port));
       socket <- managed(server.accept)) {
-      val startLine = Source.fromInputStream(socket.getInputStream).getLines().take(1)
-      startLine.next().split(" ") match {
-        case Array("GET", path, "HTTP/1.1") =>
-          val output = socket.getOutputStream
-          writeHeader.foreach(output.write(_))
-          for (src <- managed(Source.fromInputStream(Files.newInputStream(Paths.get(".", path))))) {
-            src.foreach(output.write(_))
-          }
-        case _ => sys.error("invalid")
+      val startLine: Option[Array[String]] = Source.fromInputStream(socket.getInputStream).getLines.toList.headOption.map(_.split(" "))
+      startLine.flatMap {
+        case Array("GET", path, "HTTP/1.1") => Some(path)
+        case _ => None
+      } foreach { path =>
+        val output = socket.getOutputStream
+        writeHeader.foreach(output.write(_))
+        for (src <- managed(Source.fromInputStream(Files.newInputStream(Paths.get(".", path))))) {
+          src.foreach(output.write(_))
+        }
       }
     }
   }
